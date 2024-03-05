@@ -81,25 +81,24 @@ func (h *HandlerPool) ProcessHandlerMessage(
 		return nil, e.NewError(err, e.ErrBadRequestCode)
 	}
 
+	var resp interface{}
 	ctx, arg, err = handlerHooks.BeforeHandler.ExecuteBeforePipeline(ctx, arg)
-	if err != nil {
-		return nil, err
-	}
+	if err == nil {
+		logger.Debugf("SID=%d, Data=%s", session.ID(), data)
+		args := []reflect.Value{handler.Receiver, reflect.ValueOf(ctx)}
+		if arg != nil {
+			args = append(args, reflect.ValueOf(arg))
+		}
 
-	logger.Debugf("SID=%d, Data=%s", session.ID(), data)
-	args := []reflect.Value{handler.Receiver, reflect.ValueOf(ctx)}
-	if arg != nil {
-		args = append(args, reflect.ValueOf(arg))
-	}
-
-	resp, err := util.Pcall(handler.Method, args)
-	if remote && msgType == message.Notify {
-		// This is a special case and should only happen with nats rpc client
-		// because we used nats request we have to answer to it or else a timeout
-		// will happen in the caller server and will be returned to the client
-		// the reason why we don't just Publish is to keep track of failed rpc requests
-		// with timeouts, maybe we can improve this flow
-		resp = []byte("ack")
+		resp, err = util.Pcall(handler.Method, args)
+		if remote && msgType == message.Notify {
+			// This is a special case and should only happen with nats rpc client
+			// because we used nats request we have to answer to it or else a timeout
+			// will happen in the caller server and will be returned to the client
+			// the reason why we don't just Publish is to keep track of failed rpc requests
+			// with timeouts, maybe we can improve this flow
+			resp = []byte("ack")
+		}
 	}
 
 	resp, err = handlerHooks.AfterHandler.ExecuteAfterPipeline(ctx, resp, err)

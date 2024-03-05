@@ -370,21 +370,13 @@ func (r *RemoteService) handleRPCUser(ctx context.Context, req *protos.Request, 
 	}
 
 	ctx, arg, err = r.remoteHooks.BeforeHandler.ExecuteBeforePipeline(ctx, arg)
-	if err != nil {
-		response := &protos.Response{
-			Error: &protos.Error{
-				Code: e.ErrInternalCode,
-				Msg:  err.Error(),
-			},
+	if err == nil {
+		params := []reflect.Value{remote.Receiver, reflect.ValueOf(ctx)}
+		if remote.HasArgs {
+			params = append(params, reflect.ValueOf(arg))
 		}
-		return response
+		ret, err = util.Pcall(remote.Method, params)
 	}
-
-	params := []reflect.Value{remote.Receiver, reflect.ValueOf(ctx)}
-	if remote.HasArgs {
-		params = append(params, reflect.ValueOf(arg))
-	}
-	ret, err = util.Pcall(remote.Method, params)
 
 	ret, err = r.remoteHooks.AfterHandler.ExecuteAfterPipeline(ctx, ret, err)
 	if err != nil {
